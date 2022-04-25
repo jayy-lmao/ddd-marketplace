@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use math::round;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 use uuid::Uuid;
 
 pub struct UserId {
@@ -80,6 +80,17 @@ impl Add for Money {
         Ok(Money::new(self.amount + rhs.amount, self.currency_code))
     }
 }
+impl Sub for Money {
+    type Output = Result<Money>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        if self.currency_code != rhs.currency_code {
+            return Err(anyhow!("Not same currency code"));
+        }
+        Ok(Money::new(self.amount - rhs.amount, self.currency_code))
+    }
+}
+
 impl Add<Result<Money>> for Money {
     type Output = Result<Money>;
 
@@ -119,11 +130,21 @@ impl ClassifiedAdTitle {
     }
 }
 
+#[derive(Debug)]
+pub enum ClassifiedAdState {
+    PendingReview,
+    Active,
+    InActive,
+    MarkedAsSold,
+}
+
 pub struct ClassifiedAd {
     _owner_id: UserId,
+    _approved_by: Option<UserId>,
     _text: Option<String>,
     _title: Option<String>,
     _price: Option<f64>,
+    _state: ClassifiedAdState,
 
     pub uuid: ClassifiedAdId,
 }
@@ -132,25 +153,63 @@ impl ClassifiedAd {
         Self {
             uuid: id,
             _owner_id: owner_id,
+            _approved_by: None,
             _text: None,
             _title: None,
             _price: None,
+            _state: ClassifiedAdState::InActive,
         }
     }
 
+    fn ensure_valid_state(&self) -> Result<()> {
+        let valid = match self._state {
+            ClassifiedAdState::PendingReview => {
+                self._title.is_some() && self._text.is_some() && self._price != Some(0.)
+            }
+            ClassifiedAdState::Active => {
+                self._title.is_some()
+                    && self._text.is_some()
+                    && self._price != Some(0.)
+                    && self._approved_by.is_some()
+            }
+            _ => true,
+        };
+        if !valid {
+            return Err(anyhow!("Post-checks failed in state {:?}", self._state));
+        }
+        Ok(())
+    }
+
     /// Set the classified ad's  price.
-    pub fn update_price(&mut self, price: f64) {
+    pub fn update_price(&mut self, price: f64) -> Result<()>{
         self._price = Some(price);
+        self.ensure_valid_state()
     }
 
     /// Set the classified ad's  text.
-    pub fn update_text(&mut self, text: String) {
+    pub fn update_text(&mut self, text: String) -> Result<()> {
         self._text = Some(text);
+        self.ensure_valid_state()
     }
 
     /// Set the classified ad's  title.
-    pub fn update_title(&mut self, title: String) {
+    pub fn update_title(&mut self, title: String) -> Result<()> {
         self._title = Some(title);
+        self.ensure_valid_state()
+    }
+
+    pub fn request_to_publish(&mut self) -> Result<()> {
+        if self._title == None {
+            return Err(anyhow!("Title cannot be empty"));
+        }
+        if self._text == None {
+            return Err(anyhow!("Text cannot be empty"));
+        }
+        if self._price == Some(0.) {
+            return Err(anyhow!("Price cannot be 0"));
+        }
+        self._state = ClassifiedAdState::PendingReview;
+        self.ensure_valid_state()
     }
 }
 
@@ -168,9 +227,11 @@ pub trait ICurrencyLookup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mocks
     pub struct FakeCurrencyLookup;
 
-    const CURRENCIES: Vec<CurrencyDetails> = vec![CurrencyDetails {
+    const CURRENCIES: &'static [CurrencyDetails] = &[CurrencyDetails {
         currency_code: CurrencyCode::EUR,
         in_use: true,
         decimal_places: 2,
@@ -181,11 +242,19 @@ mod tests {
             let currency = CURRENCIES
                 .iter()
                 .find(|&c| c.currency_code == currency_code)
-                .ok_or(Err(anyhow!("Could not find currency {:?}", currency_code)))?;
+                .map(|c| c.clone());
 
-            Ok(currency.clone())
+            match currency {
+                Some(currency_details) => Ok(currency_details.clone()),
+                None => Err(anyhow!(
+                    "Could not find currency with code {:?}",
+                    currency_code
+                )),
+            }
         }
     }
+
+    // Tests
 
     #[test]
     fn money_with_same_amount_should_be_equal() -> Result<()> {
@@ -204,6 +273,15 @@ mod tests {
         let banknote = Money::from_decimal(5., None, FakeCurrencyLookup)?;
 
         assert_eq!(banknote, (coin1 + coin2 + coin3).unwrap());
+        Ok(())
+    }
+    #[test]
+    fn subtracting_money() -> Result<()> {
+        let coin1 = Money::from_decimal(4., None, FakeCurrencyLookup)?;
+        let coin2 = Money::from_decimal(3., None, FakeCurrencyLookup)?;
+        let coin3 = Money::from_decimal(1., None, FakeCurrencyLookup)?;
+
+        assert_eq!((coin1 - coin2).unwrap(), coin3);
         Ok(())
     }
 }
