@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use math::round;
 use std::ops::Add;
 use uuid::Uuid;
 
@@ -21,27 +22,51 @@ impl ClassifiedAdId {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum CurrencyCode {
     EUR,
+    AUD,
 }
 const DEFAULT_CURRENCY_CODE: CurrencyCode = CurrencyCode::EUR;
 
 #[derive(PartialEq, Debug)]
 pub struct Money {
-    pub amount: i64,
+    pub amount: f64,
     pub currency_code: CurrencyCode,
 }
 
 impl Money {
-    pub fn new(amount: i64, currency: CurrencyCode) -> Self {
+    pub fn new(amount: f64, currency: CurrencyCode) -> Self {
         Self {
             amount,
             currency_code: currency,
         }
     }
-    pub fn from_decimal(amount: i64, currency: Option<CurrencyCode>) -> Self {
-        Money::new(amount, currency.unwrap_or(DEFAULT_CURRENCY_CODE))
+    pub fn from_decimal(
+        amount: f64,
+        currency_code: Option<CurrencyCode>,
+        currency_lookup: impl ICurrencyLookup,
+    ) -> Result<Self> {
+        let currency_code = match currency_code {
+            Some(code) => {
+                let currency = currency_lookup.find_currency(code.clone())?;
+                if !currency.in_use {
+                    return Err(anyhow!("Currency code {:?} is not valid", code));
+                }
+                let rounded = round::half_towards_zero(amount, currency.decimal_places);
+                if rounded != amount {
+                    return Err(anyhow!(
+                        "Amount in {:?} cannot have more than {} decimals",
+                        currency.currency_code,
+                        currency.decimal_places
+                    ));
+                }
+                currency.currency_code
+            }
+            None => DEFAULT_CURRENCY_CODE,
+        };
+
+        Ok(Money::new(amount, currency_code))
     }
 }
 
@@ -73,11 +98,11 @@ impl Add<Money> for Result<Money> {
 pub struct Price(pub Money);
 
 impl Price {
-    pub fn new(amount: i64) -> Result<Self> {
-        if amount < 0 {
+    pub fn new(amount: f64, currency_lookup: impl ICurrencyLookup) -> Result<Self> {
+        if amount < 0. {
             return Err(anyhow!("Price cannot be negative"));
         }
-        Ok(Self(Money::from_decimal(amount, None)))
+        Ok(Self(Money::from_decimal(amount, None, currency_lookup)?))
     }
 }
 
@@ -98,7 +123,7 @@ pub struct ClassifiedAd {
     _owner_id: UserId,
     _text: Option<String>,
     _title: Option<String>,
-    _price: Option<i64>,
+    _price: Option<f64>,
 
     pub uuid: ClassifiedAdId,
 }
@@ -114,7 +139,7 @@ impl ClassifiedAd {
     }
 
     /// Set the classified ad's  price.
-    pub fn update_price(&mut self, price: i64) {
+    pub fn update_price(&mut self, price: f64) {
         self._price = Some(price);
     }
 
@@ -129,25 +154,56 @@ impl ClassifiedAd {
     }
 }
 
+#[derive(Clone)]
+pub struct CurrencyDetails {
+    pub currency_code: CurrencyCode,
+    pub in_use: bool,
+    pub decimal_places: i8,
+}
+
+pub trait ICurrencyLookup {
+    fn find_currency(&self, currency_code: CurrencyCode) -> Result<CurrencyDetails>;
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{CurrencyCode, Money};
+    use super::*;
+    pub struct FakeCurrencyLookup;
 
-    #[test]
-    fn money_with_same_amount_should_be_equal() {
-        let first_amount = Money::from_decimal(5, None);
-        let second_amount = Money::from_decimal(5, None);
-        assert_eq!(first_amount, second_amount);
+    const CURRENCIES: Vec<CurrencyDetails> = vec![CurrencyDetails {
+        currency_code: CurrencyCode::EUR,
+        in_use: true,
+        decimal_places: 2,
+    }];
+
+    impl ICurrencyLookup for FakeCurrencyLookup {
+        fn find_currency(&self, currency_code: CurrencyCode) -> Result<CurrencyDetails> {
+            let currency = CURRENCIES
+                .iter()
+                .find(|&c| c.currency_code == currency_code)
+                .ok_or(Err(anyhow!("Could not find currency {:?}", currency_code)))?;
+
+            Ok(currency.clone())
+        }
     }
 
     #[test]
-    fn sum_of_money_gives_full_amount() {
-        let coin1 = Money::from_decimal(1, None);
-        let coin2 = Money::from_decimal(2, None);
-        let coin3 = Money::from_decimal(2, None);
+    fn money_with_same_amount_should_be_equal() -> Result<()> {
+        let first_amount = Money::from_decimal(5., None, FakeCurrencyLookup)?;
+        let second_amount = Money::from_decimal(5., None, FakeCurrencyLookup)?;
+        assert_eq!(first_amount, second_amount);
+        Ok(())
+    }
 
-        let banknote = Money::from_decimal(5, None);
+    #[test]
+    fn sum_of_money_gives_full_amount() -> Result<()> {
+        let coin1 = Money::from_decimal(1., None, FakeCurrencyLookup)?;
+        let coin2 = Money::from_decimal(2., None, FakeCurrencyLookup)?;
+        let coin3 = Money::from_decimal(2., None, FakeCurrencyLookup)?;
+
+        let banknote = Money::from_decimal(5., None, FakeCurrencyLookup)?;
 
         assert_eq!(banknote, (coin1 + coin2 + coin3).unwrap());
+        Ok(())
     }
 }

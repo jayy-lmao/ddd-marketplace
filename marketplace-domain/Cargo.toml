@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
+libmath = "0.2.1"
 uuid = "1.0.0"
