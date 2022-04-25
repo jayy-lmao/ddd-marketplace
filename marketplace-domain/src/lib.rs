@@ -29,7 +29,7 @@ pub enum CurrencyCode {
 }
 const DEFAULT_CURRENCY_CODE: CurrencyCode = CurrencyCode::EUR;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Money {
     pub amount: f64,
     pub currency_code: CurrencyCode,
@@ -106,14 +106,22 @@ impl Add<Money> for Result<Money> {
     }
 }
 
-pub struct Price(pub Money);
+#[derive(PartialEq, Clone)]
+pub struct Price {
+    pub money: Money,
+}
 
 impl Price {
-    pub fn new(amount: f64, currency_lookup: impl ICurrencyLookup) -> Result<Self> {
+    pub fn is_zero(&self) -> bool {
+        self.money.amount == 0.
+    }
+    pub fn from_decimal(amount: f64, currency_lookup: impl ICurrencyLookup) -> Result<Self> {
         if amount < 0. {
             return Err(anyhow!("Price cannot be negative"));
         }
-        Ok(Self(Money::from_decimal(amount, None, currency_lookup)?))
+        Ok(Self {
+            money: Money::from_decimal(amount, None, currency_lookup)?,
+        })
     }
 }
 
@@ -130,7 +138,7 @@ impl ClassifiedAdTitle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ClassifiedAdState {
     PendingReview,
     Active,
@@ -143,7 +151,7 @@ pub struct ClassifiedAd {
     _approved_by: Option<UserId>,
     _text: Option<String>,
     _title: Option<String>,
-    _price: Option<f64>,
+    _price: Option<Price>,
     _state: ClassifiedAdState,
 
     pub uuid: ClassifiedAdId,
@@ -164,12 +172,16 @@ impl ClassifiedAd {
     fn ensure_valid_state(&self) -> Result<()> {
         let valid = match self._state {
             ClassifiedAdState::PendingReview => {
-                self._title.is_some() && self._text.is_some() && self._price != Some(0.)
+                self._title.is_some()
+                    && self._text.is_some()
+                    && self._price.is_some()
+                    && !self._price.clone().unwrap().is_zero()
             }
             ClassifiedAdState::Active => {
                 self._title.is_some()
                     && self._text.is_some()
-                    && self._price != Some(0.)
+                    && self._price.is_some()
+                    && !self._price.clone().unwrap().is_zero()
                     && self._approved_by.is_some()
             }
             _ => true,
@@ -181,19 +193,19 @@ impl ClassifiedAd {
     }
 
     /// Set the classified ad's  price.
-    pub fn update_price(&mut self, price: f64) -> Result<()>{
+    pub fn update_price(&mut self, price: Price) -> Result<()> {
         self._price = Some(price);
         self.ensure_valid_state()
     }
 
     /// Set the classified ad's  text.
-    pub fn update_text(&mut self, text: String) -> Result<()> {
+    pub fn set_text(&mut self, text: String) -> Result<()> {
         self._text = Some(text);
         self.ensure_valid_state()
     }
 
     /// Set the classified ad's  title.
-    pub fn update_title(&mut self, title: String) -> Result<()> {
+    pub fn set_title(&mut self, title: String) -> Result<()> {
         self._title = Some(title);
         self.ensure_valid_state()
     }
@@ -205,11 +217,20 @@ impl ClassifiedAd {
         if self._text == None {
             return Err(anyhow!("Text cannot be empty"));
         }
-        if self._price == Some(0.) {
+        let invalid_price = match &self._price {
+            Some(p) => p.is_zero(),
+            None => true,
+        };
+        if invalid_price {
             return Err(anyhow!("Price cannot be 0"));
         }
         self._state = ClassifiedAdState::PendingReview;
         self.ensure_valid_state()
+    }
+
+    /// Get a reference to the classified ad's  state.
+    pub fn state(&self) -> ClassifiedAdState {
+        self._state.clone()
     }
 }
 
@@ -282,6 +303,26 @@ mod tests {
         let coin3 = Money::from_decimal(1., None, FakeCurrencyLookup)?;
 
         assert_eq!((coin1 - coin2).unwrap(), coin3);
+        Ok(())
+    }
+
+    #[test]
+    fn can_publish_an_ad() -> Result<()> {
+        let mut classified_ad = ClassifiedAd::new(
+            ClassifiedAdId::new(Uuid::new_v4()),
+            UserId::new(Uuid::new_v4()),
+        );
+
+        classified_ad.set_title("Test ad".into())?;
+        classified_ad.set_text("Please buy my stuff".into())?;
+        let price = Price::from_decimal(100., FakeCurrencyLookup)?;
+        classified_ad.update_price(price)?;
+        classified_ad.request_to_publish()?;
+
+        // assert!(matches!(
+        //     classified_ad.state(),
+        //     ClassifiedAdState::PendingReview
+        // ));
         Ok(())
     }
 }
