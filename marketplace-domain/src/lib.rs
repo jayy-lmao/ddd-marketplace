@@ -1,8 +1,70 @@
 use anyhow::{anyhow, Result};
+use events::*;
+use marketplace_framework::Entity;
 use math::round;
 use std::ops::{Add, Sub};
 use uuid::Uuid;
 
+pub mod events {
+    use uuid::Uuid;
+    pub enum ClassifiedAdEvents {
+        Created(ClassifiedAdCreated),
+        TextUpdated(ClassifiedAdTextUpdated),
+        TitleChanged(ClassifiedAdTitleChanged),
+        PriceUpdated(ClassifiedAdPriceUpdated),
+        SentForReview(ClassifiedAdSentForReview),
+    }
+
+    pub struct ClassifiedAdCreated {
+        pub id: Uuid,
+        pub owner_id: Uuid,
+    }
+    impl From<ClassifiedAdCreated> for ClassifiedAdEvents {
+        fn from(e: ClassifiedAdCreated) -> Self {
+            ClassifiedAdEvents::Created(e)
+        }
+    }
+
+    pub struct ClassifiedAdTitleChanged {
+        pub id: Uuid,
+        pub title: String,
+    }
+
+    impl From<ClassifiedAdTitleChanged> for ClassifiedAdEvents {
+        fn from(e: ClassifiedAdTitleChanged) -> Self {
+            ClassifiedAdEvents::TitleChanged(e)
+        }
+    }
+    pub struct ClassifiedAdTextUpdated {
+        pub id: Uuid,
+        pub ad_text: String,
+    }
+    impl From<ClassifiedAdTextUpdated> for ClassifiedAdEvents {
+        fn from(e: ClassifiedAdTextUpdated) -> Self {
+            ClassifiedAdEvents::TextUpdated(e)
+        }
+    }
+
+    pub struct ClassifiedAdPriceUpdated {
+        pub id: Uuid,
+        pub price: f64,
+    }
+    impl From<ClassifiedAdPriceUpdated> for ClassifiedAdEvents {
+        fn from(e: ClassifiedAdPriceUpdated) -> Self {
+            ClassifiedAdEvents::PriceUpdated(e)
+        }
+    }
+    pub struct ClassifiedAdSentForReview {
+        pub id: Uuid,
+    }
+    impl From<ClassifiedAdSentForReview> for ClassifiedAdEvents {
+        fn from(e: ClassifiedAdSentForReview) -> Self {
+            ClassifiedAdEvents::SentForReview(e)
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct UserId {
     _value: Uuid,
 }
@@ -12,6 +74,8 @@ impl UserId {
         Self { _value: value }
     }
 }
+
+#[derive(Clone)]
 pub struct ClassifiedAdId {
     _value: Uuid,
 }
@@ -153,11 +217,19 @@ pub struct ClassifiedAd {
     _title: Option<String>,
     _price: Option<Price>,
     _state: ClassifiedAdState,
+    _entity: Entity<ClassifiedAdEvents>,
 
     pub uuid: ClassifiedAdId,
 }
 impl ClassifiedAd {
     pub fn new(id: ClassifiedAdId, owner_id: UserId) -> Self {
+        let mut entity = Entity::new();
+        let created_event = ClassifiedAdCreated {
+            id: id.clone()._value,
+            owner_id: owner_id.clone()._value,
+        };
+        entity.raise(created_event.into());
+
         Self {
             uuid: id,
             _owner_id: owner_id,
@@ -166,6 +238,7 @@ impl ClassifiedAd {
             _title: None,
             _price: None,
             _state: ClassifiedAdState::InActive,
+            _entity: entity,
         }
     }
 
@@ -194,20 +267,42 @@ impl ClassifiedAd {
 
     /// Set the classified ad's  price.
     pub fn update_price(&mut self, price: Price) -> Result<()> {
-        self._price = Some(price);
-        self.ensure_valid_state()
+        self._price = Some(price.clone());
+        self.ensure_valid_state()?;
+        let event = ClassifiedAdPriceUpdated {
+            id: self.uuid._value,
+            price: price.money.amount,
+        };
+
+        self._entity.raise(event.into());
+        Ok(())
     }
 
     /// Set the classified ad's  text.
     pub fn set_text(&mut self, text: String) -> Result<()> {
-        self._text = Some(text);
-        self.ensure_valid_state()
+        self._text = Some(text.clone());
+        self.ensure_valid_state()?;
+
+        let text_event = ClassifiedAdTextUpdated {
+            id: self.uuid._value,
+            ad_text: text,
+        };
+        self._entity.raise(text_event.into());
+
+        Ok(())
     }
 
     /// Set the classified ad's  title.
     pub fn set_title(&mut self, title: String) -> Result<()> {
-        self._title = Some(title);
-        self.ensure_valid_state()
+        self._title = Some(title.clone());
+        self.ensure_valid_state()?;
+        let title_event = ClassifiedAdTitleChanged {
+            id: self.uuid._value,
+            title: title,
+        };
+        self._entity.raise(title_event.into());
+
+        Ok(())
     }
 
     pub fn request_to_publish(&mut self) -> Result<()> {
@@ -225,7 +320,12 @@ impl ClassifiedAd {
             return Err(anyhow!("Price cannot be 0"));
         }
         self._state = ClassifiedAdState::PendingReview;
-        self.ensure_valid_state()
+        self.ensure_valid_state()?;
+        let event = ClassifiedAdSentForReview {
+            id: self.uuid._value,
+        };
+        self._entity.raise(event.into());
+        Ok(())
     }
 
     /// Get a reference to the classified ad's  state.

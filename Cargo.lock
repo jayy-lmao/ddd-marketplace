@@ -52,8 +52,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "libmath",
+ "marketplace-framework",
  "uuid",
 ]
+
+[[package]]
+name = "marketplace-framework"
+version = "0.1.0"
 
 [[package]]
 name = "rand"
