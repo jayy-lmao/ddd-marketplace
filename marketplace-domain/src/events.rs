@@ -7,6 +7,7 @@ pub enum ClassifiedAdEvents {
     SentForReview(ClassifiedAdSentForReview),
 }
 
+#[derive(Clone)]
 pub struct ClassifiedAdCreated {
     pub id: Uuid,
     pub owner_id: Uuid,
@@ -17,6 +18,7 @@ impl From<ClassifiedAdCreated> for ClassifiedAdEvents {
     }
 }
 
+#[derive(Clone)]
 pub struct ClassifiedAdTitleChanged {
     pub id: Uuid,
     pub title: String,
@@ -27,6 +29,7 @@ impl From<ClassifiedAdTitleChanged> for ClassifiedAdEvents {
         ClassifiedAdEvents::TitleChanged(e)
     }
 }
+#[derive(Clone)]
 pub struct ClassifiedAdTextUpdated {
     pub id: Uuid,
     pub ad_text: String,
@@ -37,6 +40,7 @@ impl From<ClassifiedAdTextUpdated> for ClassifiedAdEvents {
     }
 }
 
+#[derive(Clone)]
 pub struct ClassifiedAdPriceUpdated {
     pub id: Uuid,
     pub price: f64,
@@ -46,6 +50,7 @@ impl From<ClassifiedAdPriceUpdated> for ClassifiedAdEvents {
         ClassifiedAdEvents::PriceUpdated(e)
     }
 }
+#[derive(Clone)]
 pub struct ClassifiedAdSentForReview {
     pub id: Uuid,
 }

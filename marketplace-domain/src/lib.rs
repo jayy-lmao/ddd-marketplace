@@ -12,8 +12,8 @@ pub use simple_types::*;
 pub struct ClassifiedAd {
     _owner_id: UserId,
     _approved_by: Option<UserId>,
-    _text: Option<String>,
-    _title: Option<String>,
+    _text: Option<ClassifiedAdText>,
+    _title: Option<ClassifiedAdTitle>,
     _price: Option<Price>,
     _state: ClassifiedAdState,
     _entity: Entity<ClassifiedAdEvents>,
@@ -41,6 +41,27 @@ impl ClassifiedAd {
         }
     }
 
+    fn apply(&mut self, event: events::ClassifiedAdEvents) -> Result<()> {
+        match event {
+            ClassifiedAdEvents::Created(e) => {
+                self._owner_id = UserId::new(e.owner_id);
+                self.uuid = ClassifiedAdId::new(e.id);
+                self._state = ClassifiedAdState::InActive;
+            }
+            ClassifiedAdEvents::TextUpdated(e) => {
+                self._text = Some(ClassifiedAdText::new(e.ad_text))
+            }
+            ClassifiedAdEvents::TitleChanged(e) => {
+                self._title = Some(ClassifiedAdTitle::new(e.title)?)
+            }
+            ClassifiedAdEvents::PriceUpdated(e) => {
+                self._price = Some(Price::from_decimal(e.price, None, FakeCurrencyLookup)?)
+            }
+            ClassifiedAdEvents::SentForReview(e) => self._state = ClassifiedAdState::PendingReview,
+        }
+        self.ensure_valid_state()
+    }
+
     fn ensure_valid_state(&self) -> Result<()> {
         let valid = match self._state {
             ClassifiedAdState::PendingReview => {
@@ -66,40 +87,36 @@ impl ClassifiedAd {
 
     /// Set the classified ad's  price.
     pub fn update_price(&mut self, price: Price) -> Result<()> {
-        self._price = Some(price.clone());
-        self.ensure_valid_state()?;
         let event = ClassifiedAdPriceUpdated {
             id: self.uuid.value(),
             price: price.money.amount,
         };
 
-        self._entity.raise(event.into());
+        self._entity.raise(event.clone().into());
+        self.apply(event.into())?;
         Ok(())
     }
 
     /// Set the classified ad's  text.
     pub fn set_text(&mut self, text: String) -> Result<()> {
-        self._text = Some(text.clone());
-        self.ensure_valid_state()?;
-
-        let text_event = ClassifiedAdTextUpdated {
+        let event = ClassifiedAdTextUpdated {
             id: self.uuid.value(),
             ad_text: text,
         };
-        self._entity.raise(text_event.into());
+        self._entity.raise(event.clone().into());
+        self.apply(event.into())?;
 
         Ok(())
     }
 
     /// Set the classified ad's  title.
     pub fn set_title(&mut self, title: String) -> Result<()> {
-        self._title = Some(title.clone());
-        self.ensure_valid_state()?;
-        let title_event = ClassifiedAdTitleChanged {
+        let event = ClassifiedAdTitleChanged {
             id: self.uuid.value(),
-            title: title,
+            title,
         };
-        self._entity.raise(title_event.into());
+        self._entity.raise(event.clone().into());
+        self.apply(event.into())?;
 
         Ok(())
     }
@@ -118,18 +135,44 @@ impl ClassifiedAd {
         if invalid_price {
             return Err(anyhow!("Price cannot be 0"));
         }
-        self._state = ClassifiedAdState::PendingReview;
-        self.ensure_valid_state()?;
+
         let event = ClassifiedAdSentForReview {
             id: self.uuid.value(),
         };
-        self._entity.raise(event.into());
+
+        self._entity.raise(event.clone().into());
+        self.apply(event.into())?;
         Ok(())
     }
 
     /// Get a reference to the classified ad's  state.
     pub fn state(&self) -> ClassifiedAdState {
         self._state.clone()
+    }
+}
+
+pub struct FakeCurrencyLookup;
+
+const CURRENCIES: &'static [CurrencyDetails] = &[CurrencyDetails {
+    currency_code: CurrencyCode::EUR,
+    in_use: true,
+    decimal_places: 2,
+}];
+
+impl ICurrencyLookup for FakeCurrencyLookup {
+    fn find_currency(&self, currency_code: CurrencyCode) -> Result<CurrencyDetails> {
+        let currency = CURRENCIES
+            .iter()
+            .find(|&c| c.currency_code == currency_code)
+            .map(|c| c.clone());
+
+        match currency {
+            Some(currency_details) => Ok(currency_details.clone()),
+            None => Err(anyhow!(
+                "Could not find currency with code {:?}",
+                currency_code
+            )),
+        }
     }
 }
 
@@ -141,31 +184,6 @@ mod tests {
     use super::*;
 
     // Mocks
-    pub struct FakeCurrencyLookup;
-
-    const CURRENCIES: &'static [CurrencyDetails] = &[CurrencyDetails {
-        currency_code: CurrencyCode::EUR,
-        in_use: true,
-        decimal_places: 2,
-    }];
-
-    impl ICurrencyLookup for FakeCurrencyLookup {
-        fn find_currency(&self, currency_code: CurrencyCode) -> Result<CurrencyDetails> {
-            let currency = CURRENCIES
-                .iter()
-                .find(|&c| c.currency_code == currency_code)
-                .map(|c| c.clone());
-
-            match currency {
-                Some(currency_details) => Ok(currency_details.clone()),
-                None => Err(anyhow!(
-                    "Could not find currency with code {:?}",
-                    currency_code
-                )),
-            }
-        }
-    }
-
     // Tests
 
     #[test]
@@ -206,7 +224,7 @@ mod tests {
 
         classified_ad.set_title("Test ad".into())?;
         classified_ad.set_text("Please buy my stuff".into())?;
-        let price = Price::from_decimal(100., FakeCurrencyLookup)?;
+        let price = Price::from_decimal(100., None, FakeCurrencyLookup)?;
         classified_ad.update_price(price)?;
         classified_ad.request_to_publish()?;
 

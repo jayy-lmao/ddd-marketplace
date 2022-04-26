@@ -9,4 +9,5 @@ edition = "2021"
 anyhow = "1.0.57"
 libmath = "0.2.1"
 uuid = { version = "1.0.0", features = ["v4"] }
+lazy_static = "1.4.0"
 marketplace-framework = { path = "../marketplace-framework" }

@@ -1,4 +1,4 @@
-use crate::ports::*;
+use crate::{ports::*, FakeCurrencyLookup};
 use anyhow::{anyhow, Result};
 use math::round;
 use std::ops::{Add, Sub};
@@ -77,7 +77,7 @@ impl Money {
                 }
                 currency.currency_code
             }
-            None => DEFAULT_CURRENCY_CODE,
+            _ => DEFAULT_CURRENCY_CODE,
         };
 
         Ok(Money::new(amount, currency_code))
@@ -129,16 +129,21 @@ impl Price {
     pub fn is_zero(&self) -> bool {
         self.money.amount == 0.
     }
-    pub fn from_decimal(amount: f64, currency_lookup: impl ICurrencyLookup) -> Result<Self> {
+    pub fn from_decimal(
+        amount: f64,
+        currency: Option<CurrencyCode>,
+        lookup: impl ICurrencyLookup,
+    ) -> Result<Self> {
         if amount < 0. {
             return Err(anyhow!("Price cannot be negative"));
         }
         Ok(Self {
-            money: Money::from_decimal(amount, None, currency_lookup)?,
+            money: Money::from_decimal(amount, currency, lookup)?,
         })
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct ClassifiedAdTitle {
     _value: String,
 }
@@ -149,6 +154,16 @@ impl ClassifiedAdTitle {
             return Err(anyhow!("Title cannot be longer than 100 characters"));
         }
         Ok(Self { _value: title })
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub struct ClassifiedAdText {
+    _value: String,
+}
+
+impl ClassifiedAdText {
+    pub fn new(text: String) -> Self {
+        Self { _value: text }
     }
 }
 
