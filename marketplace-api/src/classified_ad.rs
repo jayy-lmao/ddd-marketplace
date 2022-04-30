@@ -75,13 +75,33 @@ impl ClassifiedAdsCommandApi {
 #[derive(Clone)]
 pub struct ClassifiedAdsApplicationService {
     _api: ClassifiedAdsCommandApi,
+    _repository: Arc<Mutex<dyn IEntityStore<Entity = ClassifiedAd>>>,
 }
 
 impl ClassifiedAdsApplicationService {
     pub fn new() -> Self {
         Self {
             _api: ClassifiedAdsCommandApi::new(),
+            _repository: Arc::new(Mutex::new(ClassifiedAdStore::new())),
         }
+    }
+    fn handle_create(&self, cmd: v1::Create) {
+        if self._repository.lock().unwrap().exists(cmd.id.to_string()) {
+            todo!()
+        }
+        let classified_ad =
+            ClassifiedAd::new(ClassifiedAdId::new(cmd.id), UserId::new(cmd.owner_id));
+        self._repository.lock().unwrap().save(classified_ad);
+    }
+    fn handle_update(&self, id: ClassifiedAdId, operation: fn(c: &mut ClassifiedAd)) {
+        let mut classified_ad = self
+            ._repository
+            .lock()
+            .unwrap()
+            .load(id.value().to_string())
+            .clone();
+        operation(&mut classified_ad);
+        self._repository.lock().unwrap().save(classified_ad);
     }
 }
 
@@ -89,8 +109,10 @@ impl IApplicationService for ClassifiedAdsApplicationService {
     type Command = v1::Commands;
     fn handle(&self, command: impl Into<Self::Command>) {
         match command.into() {
-            v1::Commands::Create(cmd) => self._api.create_ad_command_handler.handle(cmd),
-            v1::Commands::SetTitle(_) => todo!(),
+            v1::Commands::Create(cmd) => self.handle_create(cmd),
+            v1::Commands::SetTitle(cmd) => self.handle_update(ClassifiedAdId::new(cmd.id), |c| {
+                c.update_title(ClassifiedAdTitle::new(cmd.title))
+            }),
             v1::Commands::UpdateText(_) => todo!(),
             v1::Commands::UpdatePrice(_) => todo!(),
             v1::Commands::RequestToPublish(_) => todo!(),
