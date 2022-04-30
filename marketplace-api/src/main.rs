@@ -1,14 +1,26 @@
 use std::{
     collections::HashMap,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
+use marketplace_contracts::classified_ads;
 use marketplace_domain::*;
-use poem::{listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
+// use poem::{listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
+use poem::{
+    error::InternalServerError, http::StatusCode, listener::TcpListener, middleware::Cors,
+    web::Data, EndpointExt, Result, Route, Server,
+};
+use poem_openapi::{
+    param::Path,
+    payload::{Json, PlainText},
+    ApiResponse, Object, OpenApi, OpenApiService,
+};
+use uuid::Uuid;
 
 pub trait IHandleCommand {
     type Command;
-    fn handle(&mut self, command: Self::Command);
+    fn handle(&self, command: Self::Command);
 }
 
 pub trait IEntityStore: Sync + Send {
@@ -54,12 +66,12 @@ impl CreateClassifiedAdHandler {
 impl IHandleCommand for CreateClassifiedAdHandler {
     type Command = marketplace_contracts::classified_ads::v1::Create;
 
-    fn handle(&mut self, command: Self::Command) {
+    fn handle(&self, command: Self::Command) {
         let classified_ad = ClassifiedAd::new(
             ClassifiedAdId::new(command.id),
             UserId::new(command.owner_id),
         );
-        return self._store.lock().unwrap().save(classified_ad);
+        return self._store.clone().lock().unwrap().save(classified_ad);
     }
 }
 #[derive(Clone)]
@@ -75,43 +87,78 @@ impl ClassifiedAdsCommandApi {
     }
 }
 
-pub mod ad {
-    use std::sync::Arc;
+// pub mod ad {
+//     use poem::{handler, http::StatusCode, post, web, Route};
 
-    use marketplace_contracts::classified_ads;
-    use poem::{handler, http::StatusCode, post, web, Route};
-    use tokio::sync::Mutex;
+//     use crate::{ClassifiedAdsCommandApi, IHandleCommand};
 
-    use crate::{ClassifiedAdsCommandApi, IHandleCommand};
+//     pub fn route() -> Route {
+//         Route::new().at("/", post(create_ad))
+//     }
 
-    pub fn route() -> Route {
-        Route::new().at("/", post(create_ad))
-    }
+//     #[handler]
+//     async fn create_ad(
+//         web::Data(classified_ads_cmd_api): web::Data<&ClassifiedAdsCommandApi>,
+//         web::Json(request): web::Json<marketplace_contracts::classified_ads::v1::Create>,
+//     ) -> StatusCode {
+//         let res = classified_ads_cmd_api
+//             .create_ad_command_handler
+//             .clone()
+//             .handle(request);
+//         StatusCode::CREATED
+//     }
+// }
 
-    #[handler]
-    async fn create_ad(
-        web::Data(classified_ads_cmd_api): web::Data<&Arc<Mutex<ClassifiedAdsCommandApi>>>,
-        web::Json(request): web::Json<marketplace_contracts::classified_ads::v1::Create>,
-    ) -> StatusCode {
-        let res = classified_ads_cmd_api
-            .lock()
-            .await
-            .create_ad_command_handler
-            .handle(request);
-        StatusCode::CREATED
+// Create
+#[derive(Object)]
+pub struct ClassifiedAdsV1Create {
+    /// Uuid
+    id: String,
+    /// Uuid of owner
+    owner_id: String,
+}
+
+struct ClassifiedAdApi;
+#[OpenApi]
+impl ClassifiedAdApi {
+    /// Create an item
+    #[oai(path = "/ad", method = "post")]
+    async fn create(
+        &self,
+        classified_ads_cmd_api: Data<&ClassifiedAdsCommandApi>,
+        request: Json<ClassifiedAdsV1Create>,
+    ) -> Result<Json<i64>> {
+        let id = Uuid::from_str(request.id.as_str()).unwrap();
+        let owner_id = Uuid::from_str(request.owner_id.as_str()).unwrap();
+        let cmd = marketplace_contracts::classified_ads::v1::Create { id, owner_id };
+        classified_ads_cmd_api.create_ad_command_handler.handle(cmd);
+
+        Ok(Json(34))
     }
 }
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    // let classified_ads_service = Arc::new(ClassifiedAdsApplicationService::new());
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "poem=debug");
+    }
+    tracing_subscriber::fmt::init();
     let classified_ads_api = ClassifiedAdsCommandApi::new();
 
-    let app = Route::new().nest(
-        "/ad",
-        ad::route().with(AddData::new(Arc::new(Mutex::new(classified_ads_api)))),
-    );
+    let api_service = OpenApiService::new(ClassifiedAdApi, "Classified Ads", "1.0.0")
+        .server("http://localhost:8000");
+    let ui = api_service.swagger_ui();
+    let spec = api_service.spec();
+    let route = Route::new()
+        .nest("/", api_service)
+        .nest("/ui", ui)
+        .at("/spec", poem::endpoint::make_sync(move |_| spec.clone()))
+        .with(Cors::new())
+        .data(classified_ads_api);
+
+    // let app = Route::new().nest("/ad", ad::route().with(AddData::new(classified_ads_api)));
     Server::new(TcpListener::bind("127.0.0.1:8000"))
-        .run(app)
-        .await
+        .run(route)
+        .await?;
+    Ok(())
 }
