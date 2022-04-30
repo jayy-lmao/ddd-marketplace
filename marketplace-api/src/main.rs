@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use classified_ad::{
+    ClassifiedAdV1RequestToPublish, ClassifiedAdV1SetTitle, ClassifiedAdV1UpdatePrice,
     ClassifiedAdV1UpdateText, ClassifiedAdsApplicationService, ClassifiedAdsCommandApi,
     ClassifiedAdsV1Create,
 };
@@ -26,29 +27,72 @@ impl ClassifiedAdApi {
     #[oai(path = "/ad", method = "post")]
     async fn create(
         &self,
-        classified_ads_cmd_api: Data<&ClassifiedAdsApplicationService>,
+        application_service: Data<&ClassifiedAdsApplicationService>,
         request: Json<ClassifiedAdsV1Create>,
     ) -> Result<PlainText<String>> {
         let id = Uuid::from_str(request.id.as_str()).unwrap();
         let owner_id = Uuid::from_str(request.owner_id.as_str()).unwrap();
         let cmd = marketplace_contracts::classified_ads::v1::Create { id, owner_id };
-        classified_ads_cmd_api.handle(cmd);
+        application_service.handle(cmd);
 
         Ok(PlainText(String::from("Created")))
+    }
+    /// Update the title of an add
+    #[oai(path = "/ad/title", method = "put")]
+    async fn update_title(
+        &self,
+        application_service: Data<&ClassifiedAdsApplicationService>,
+        request: Json<ClassifiedAdV1SetTitle>,
+    ) -> Result<PlainText<String>> {
+        let id = Uuid::from_str(request.id.as_str()).unwrap();
+        let title = request.title.clone();
+        let cmd = marketplace_contracts::classified_ads::v1::SetTitle { id, title };
+        application_service.handle(cmd);
+        Ok(PlainText(String::from("Updated")))
     }
     /// Update the text of an add
     #[oai(path = "/ad/text", method = "put")]
     async fn update_text(
         &self,
-        classified_ads_cmd_api: Data<&ClassifiedAdsApplicationService>,
+        application_service: Data<&ClassifiedAdsApplicationService>,
         request: Json<ClassifiedAdV1UpdateText>,
     ) -> Result<PlainText<String>> {
         let id = Uuid::from_str(request.id.as_str()).unwrap();
         let text = request.text.clone();
         let cmd = marketplace_contracts::classified_ads::v1::UpdateText { id, text };
-        classified_ads_cmd_api.handle(cmd);
+        application_service.handle(cmd);
 
-        Ok(PlainText(String::from("Created")))
+        Ok(PlainText(String::from("Updated")))
+    }
+    /// Update the price
+    #[oai(path = "/ad/price", method = "put")]
+    async fn update_price(
+        &self,
+        application_service: Data<&ClassifiedAdsApplicationService>,
+        request: Json<ClassifiedAdV1UpdatePrice>,
+    ) -> Result<PlainText<String>> {
+        let id = Uuid::from_str(request.id.as_str()).unwrap();
+        let price = request.price.clone();
+        let currency = request.currency.clone();
+        let cmd = marketplace_contracts::classified_ads::v1::UpdatePrice {
+            id,
+            price,
+            currency,
+        };
+        application_service.handle(cmd);
+        Ok(PlainText(String::from("Updated")))
+    }
+    /// Update the price
+    #[oai(path = "/ad/publish", method = "put")]
+    async fn publish(
+        &self,
+        application_service: Data<&ClassifiedAdsApplicationService>,
+        request: Json<ClassifiedAdV1RequestToPublish>,
+    ) -> Result<PlainText<String>> {
+        let id = Uuid::from_str(request.id.as_str()).unwrap();
+        let cmd = marketplace_contracts::classified_ads::v1::RequestToPublish { id };
+        application_service.handle(cmd);
+        Ok(PlainText(String::from("Updated")))
     }
 }
 
@@ -58,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_var("RUST_LOG", "poem=debug");
     }
     tracing_subscriber::fmt::init();
-    let classified_ads_api = ClassifiedAdsApplicationService::new();
+    let classified_ads_application_service = ClassifiedAdsApplicationService::new();
 
     let api_service = OpenApiService::new(ClassifiedAdApi, "Classified Ads", "1.0.0")
         .server("http://localhost:8000");
@@ -69,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/ui", ui)
         .at("/spec", poem::endpoint::make_sync(move |_| spec.clone()))
         .with(Cors::new())
-        .data(classified_ads_api);
+        .data(classified_ads_application_service);
 
     // let app = Route::new().nest("/ad", ad::route().with(AddData::new(classified_ads_api)));
     Server::new(TcpListener::bind("127.0.0.1:8000"))

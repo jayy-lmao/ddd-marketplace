@@ -8,6 +8,7 @@ pub trait IHandleCommand {
 pub trait IEntityStore: Sync + Send {
     type Entity;
     fn load(&self, id: String) -> Self::Entity;
+    fn exists(&self, id: String) -> bool;
     fn save(&mut self, entity: Self::Entity);
 }
 

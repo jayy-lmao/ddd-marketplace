@@ -22,10 +22,15 @@ impl ClassifiedAdStore {
 }
 impl IEntityStore for ClassifiedAdStore {
     type Entity = ClassifiedAd;
+
     fn save(&mut self, ad: ClassifiedAd) {
         self._store.insert(ad.uuid.value().to_string(), ad);
     }
 
+    fn exists(&self, id: String) -> bool {
+        let exists = self._store.get(&id).is_some();
+        exists
+    }
     fn load(&self, id: String) -> ClassifiedAd {
         let ad = self._store.get(&id).unwrap();
         ad.clone()
