@@ -1,4 +1,3 @@
-
 #[derive(Clone)]
 pub struct Entity<T> {
     _events: Vec<T>,
