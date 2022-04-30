@@ -1,4 +1,6 @@
 use uuid::Uuid;
+
+#[derive(Clone)]
 pub enum ClassifiedAdEvents {
     Created(ClassifiedAdCreated),
     TextUpdated(ClassifiedAdTextUpdated),

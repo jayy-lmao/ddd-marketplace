@@ -20,7 +20,7 @@ impl UserId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq, Copy)]
 pub struct ClassifiedAdId {
     _value: Uuid,
 }

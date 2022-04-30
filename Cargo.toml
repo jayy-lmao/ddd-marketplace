@@ -3,5 +3,7 @@
 members = [
     "marketplace-domain",
     "marketplace-framework",
+    "marketplace-contracts",
+    "marketplace-api",
 ]
 

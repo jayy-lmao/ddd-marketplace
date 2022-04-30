@@ -9,6 +9,7 @@ pub mod simple_types;
 pub use ports::*;
 pub use simple_types::*;
 
+#[derive(Clone)]
 pub struct ClassifiedAd {
     _owner_id: UserId,
     _approved_by: Option<UserId>,
