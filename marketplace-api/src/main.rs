@@ -1,23 +1,20 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    sync::{Arc, Mutex},
+use std::str::FromStr;
+
+use classified_ad::{
+    ClassifiedAdV1UpdateText, ClassifiedAdsApplicationService, ClassifiedAdsCommandApi,
+    ClassifiedAdsV1Create,
 };
 
-use classified_ad::{ClassifiedAdsCommandApi, ClassifiedAdsV1Create};
-use marketplace_contracts::classified_ads;
-use marketplace_domain::*;
 // use poem::{listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
 use poem::{
-    error::InternalServerError, http::StatusCode, listener::TcpListener, middleware::Cors,
-    web::Data, EndpointExt, Result, Route, Server,
+    http::StatusCode, listener::TcpListener, middleware::Cors, web::Data, EndpointExt, Result,
+    Route, Server,
 };
 use poem_openapi::{
-    param::Path,
     payload::{Json, PlainText},
-    ApiResponse, Object, OpenApi, OpenApiService,
+    OpenApi, OpenApiService,
 };
-use traits::IHandleCommand;
+use traits::{IApplicationService, IHandleCommand};
 use uuid::Uuid;
 pub mod classified_ad;
 pub mod traits;
@@ -25,19 +22,33 @@ pub mod traits;
 struct ClassifiedAdApi;
 #[OpenApi]
 impl ClassifiedAdApi {
-    /// Create an item
+    /// Create a classified ad
     #[oai(path = "/ad", method = "post")]
     async fn create(
         &self,
-        classified_ads_cmd_api: Data<&ClassifiedAdsCommandApi>,
+        classified_ads_cmd_api: Data<&ClassifiedAdsApplicationService>,
         request: Json<ClassifiedAdsV1Create>,
-    ) -> Result<Json<i64>> {
+    ) -> Result<PlainText<String>> {
         let id = Uuid::from_str(request.id.as_str()).unwrap();
         let owner_id = Uuid::from_str(request.owner_id.as_str()).unwrap();
         let cmd = marketplace_contracts::classified_ads::v1::Create { id, owner_id };
-        classified_ads_cmd_api.create_ad_command_handler.handle(cmd);
+        classified_ads_cmd_api.handle(cmd);
 
-        Ok(Json(34))
+        Ok(PlainText(String::from("Created")))
+    }
+    /// Update the text of an add
+    #[oai(path = "/ad/text", method = "put")]
+    async fn update_text(
+        &self,
+        classified_ads_cmd_api: Data<&ClassifiedAdsApplicationService>,
+        request: Json<ClassifiedAdV1UpdateText>,
+    ) -> Result<PlainText<String>> {
+        let id = Uuid::from_str(request.id.as_str()).unwrap();
+        let text = request.text.clone();
+        let cmd = marketplace_contracts::classified_ads::v1::UpdateText { id, text };
+        classified_ads_cmd_api.handle(cmd);
+
+        Ok(PlainText(String::from("Created")))
     }
 }
 
@@ -47,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_var("RUST_LOG", "poem=debug");
     }
     tracing_subscriber::fmt::init();
-    let classified_ads_api = ClassifiedAdsCommandApi::new();
+    let classified_ads_api = ClassifiedAdsApplicationService::new();
 
     let api_service = OpenApiService::new(ClassifiedAdApi, "Classified Ads", "1.0.0")
         .server("http://localhost:8000");

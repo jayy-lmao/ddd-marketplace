@@ -1,4 +1,4 @@
-use crate::{ports::*, FakeCurrencyLookup};
+use crate::{ports::*};
 use anyhow::{anyhow, Result};
 use math::round;
 use std::ops::{Add, Sub};

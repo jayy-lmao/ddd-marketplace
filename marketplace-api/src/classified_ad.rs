@@ -3,10 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use marketplace_contracts::classified_ads::v1;
 use marketplace_domain::*;
 use poem_openapi::Object;
 
-use crate::traits::{IEntityStore, IHandleCommand};
+use crate::traits::{IApplicationService, IEntityStore, IHandleCommand};
 
 pub struct ClassifiedAdStore {
     _store: HashMap<String, ClassifiedAd>,
@@ -66,11 +67,63 @@ impl ClassifiedAdsCommandApi {
     }
 }
 
+#[derive(Clone)]
+pub struct ClassifiedAdsApplicationService {
+    _api: ClassifiedAdsCommandApi,
+}
+
+impl ClassifiedAdsApplicationService {
+    pub fn new() -> Self {
+        Self {
+            _api: ClassifiedAdsCommandApi::new(),
+        }
+    }
+}
+
+impl IApplicationService for ClassifiedAdsApplicationService {
+    type Command = v1::Commands;
+    fn handle(&self, command: impl Into<Self::Command>) {
+        match command.into() {
+            v1::Commands::Create(cmd) => self._api.create_ad_command_handler.handle(cmd),
+            v1::Commands::SetTitle(_) => todo!(),
+            v1::Commands::UpdateText(_) => todo!(),
+            v1::Commands::UpdatePrice(_) => todo!(),
+            v1::Commands::RequestToPublish(_) => todo!(),
+        }
+    }
+}
+
 /// Create
 #[derive(Object)]
 pub struct ClassifiedAdsV1Create {
-    /// Uuid
+    /// String
     pub id: String,
-    /// Uuid of owner
+    /// String of owner
     pub owner_id: String,
+}
+
+#[derive(Object)]
+pub struct ClassifiedAdV1Create {
+    pub id: String,
+    pub owner_id: String,
+}
+#[derive(Object)]
+pub struct ClassifiedAdV1SetTitle {
+    pub id: String,
+    pub title: String,
+}
+#[derive(Object)]
+pub struct ClassifiedAdV1UpdateText {
+    pub id: String,
+    pub text: String,
+}
+#[derive(Object)]
+pub struct ClassifiedAdV1UpdatePrice {
+    pub id: String,
+    pub price: f64,
+    pub currency: String,
+}
+#[derive(Object)]
+pub struct ClassifiedAdV1RequestToPublish {
+    pub id: String,
 }

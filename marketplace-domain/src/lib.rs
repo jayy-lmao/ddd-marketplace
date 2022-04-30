@@ -26,7 +26,7 @@ impl ClassifiedAd {
         let mut entity = Entity::new();
         let created_event = ClassifiedAdCreated {
             id: id.clone().value(),
-            owner_id: owner_id.clone().value(),
+            owner_id: owner_id.value(),
         };
         entity.raise(created_event.into());
 
@@ -58,7 +58,7 @@ impl ClassifiedAd {
             ClassifiedAdEvents::PriceUpdated(e) => {
                 self._price = Some(Price::from_decimal(e.price, None, FakeCurrencyLookup)?)
             }
-            ClassifiedAdEvents::SentForReview(e) => self._state = ClassifiedAdState::PendingReview,
+            ClassifiedAdEvents::SentForReview(_e) => self._state = ClassifiedAdState::PendingReview,
         }
         self.ensure_valid_state()
     }
@@ -154,7 +154,7 @@ impl ClassifiedAd {
 
 pub struct FakeCurrencyLookup;
 
-const CURRENCIES: &'static [CurrencyDetails] = &[CurrencyDetails {
+const CURRENCIES: &[CurrencyDetails] = &[CurrencyDetails {
     currency_code: CurrencyCode::EUR,
     in_use: true,
     decimal_places: 2,
@@ -164,11 +164,10 @@ impl ICurrencyLookup for FakeCurrencyLookup {
     fn find_currency(&self, currency_code: CurrencyCode) -> Result<CurrencyDetails> {
         let currency = CURRENCIES
             .iter()
-            .find(|&c| c.currency_code == currency_code)
-            .map(|c| c.clone());
+            .find(|&c| c.currency_code == currency_code).cloned();
 
         match currency {
-            Some(currency_details) => Ok(currency_details.clone()),
+            Some(currency_details) => Ok(currency_details),
             None => Err(anyhow!(
                 "Could not find currency with code {:?}",
                 currency_code
