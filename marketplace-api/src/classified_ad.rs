@@ -93,14 +93,19 @@ impl ClassifiedAdsApplicationService {
             ClassifiedAd::new(ClassifiedAdId::new(cmd.id), UserId::new(cmd.owner_id));
         self._repository.lock().unwrap().save(classified_ad);
     }
-    fn handle_update(&self, id: ClassifiedAdId, operation: fn(c: &mut ClassifiedAd)) {
+    fn handle_update<Cmd>(
+        &self,
+        id: ClassifiedAdId,
+        cmd: Cmd,
+        operation: fn(cmd: Cmd, c: &mut ClassifiedAd),
+    ) {
         let mut classified_ad = self
             ._repository
             .lock()
             .unwrap()
             .load(id.value().to_string())
             .clone();
-        operation(&mut classified_ad);
+        operation(cmd, &mut classified_ad);
         self._repository.lock().unwrap().save(classified_ad);
     }
 }
@@ -110,9 +115,11 @@ impl IApplicationService for ClassifiedAdsApplicationService {
     fn handle(&self, command: impl Into<Self::Command>) {
         match command.into() {
             v1::Commands::Create(cmd) => self.handle_create(cmd),
-            v1::Commands::SetTitle(cmd) => self.handle_update(ClassifiedAdId::new(cmd.id), |c| {
-                c.update_title(ClassifiedAdTitle::new(cmd.title))
-            }),
+            v1::Commands::SetTitle(cmd) => {
+                self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
+                    c.set_title(cmd.title).expect("Could not set title");
+                });
+            }
             v1::Commands::UpdateText(_) => todo!(),
             v1::Commands::UpdatePrice(_) => todo!(),
             v1::Commands::RequestToPublish(_) => todo!(),
