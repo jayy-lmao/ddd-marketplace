@@ -2,8 +2,6 @@
  * This approach of using almost exclusively traits
  * is a much more recent iteration on the approach
  * used for marketplace ads
- *
- * TODO: I should attempt to migrate the classified ad approach to this model, As it is more simple
  */
 use crate::UserId;
 use anyhow::Result;
