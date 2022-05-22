@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use marketplace_contracts::classified_ads::v1::{self};
-use marketplace_domain::*;
+use marketplace_domain::{classified_ad::*, UserId};
 use poem_openapi::Object;
 
 use crate::traits::{IApplicationService, IEntityStore, IHandleCommand};
@@ -24,8 +24,9 @@ impl ClassifiedAdStore {
 impl IEntityStore for ClassifiedAdStore {
     type Entity = ClassifiedAd;
 
-    fn save(&mut self, ad: ClassifiedAd) {
-        self._store.insert(ad.uuid.value().to_string(), ad);
+    fn save(&mut self, ad: ClassifiedAd) -> Result<()> {
+        self._store.insert(ad.id()?.value().to_string(), ad);
+        Ok(())
     }
 
     fn exists(&self, id: String) -> bool {
@@ -52,12 +53,13 @@ impl CreateClassifiedAdHandler {
 impl IHandleCommand for CreateClassifiedAdHandler {
     type Command = marketplace_contracts::classified_ads::v1::Create;
 
-    fn handle(&self, command: Self::Command) {
+    fn handle(&self, command: Self::Command) -> Result<()> {
         let classified_ad = ClassifiedAd::new(
             ClassifiedAdId::new(command.id),
             UserId::new(command.owner_id),
         );
-        return self._store.clone().lock().unwrap().save(classified_ad);
+        self._store.clone().lock().unwrap().save(classified_ad)?;
+        Ok(())
     }
 }
 #[derive(Clone)]
@@ -119,14 +121,15 @@ impl IApplicationService for ClassifiedAdsApplicationService {
         match command.into() {
             v1::Commands::Create(cmd) => self.handle_create(cmd)?,
             v1::Commands::SetTitle(cmd) => {
-                self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
-                    c.set_title(cmd.title).expect("Could not set title");
-                })?;
+                // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
+                //     let title = ClassifiedAdTitle::new()
+                //     c.set_title(cmd.title).expect("Could not set title");
+                // })?;
             }
             v1::Commands::UpdateText(cmd) => {
-                self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
-                    c.set_text(cmd.text).expect("Could not set text");
-                })?
+                // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
+                //     c.set_text(cmd.text).expect("Could not set text");
+                // })?
             }
             v1::Commands::UpdatePrice(_) => todo!(),
             v1::Commands::RequestToPublish(_) => todo!(),

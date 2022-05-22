@@ -7,26 +7,7 @@
  */
 use crate::UserId;
 use anyhow::Result;
-
-// ================================================================================
-// Traits (Should be moved to marketplace framework)
-// ================================================================================
-
-pub trait AggregateRoot {
-    type Id;
-    type Event: Clone;
-    fn ensure_valid_state(&self) -> Result<()>;
-    fn when(&mut self, event: Self::Event) -> Result<()>;
-    fn store_changes(&mut self, event: Self::Event) -> Result<()>;
-
-    fn apply(&mut self, event: impl Into<Self::Event>) -> Result<()> {
-        let event: Self::Event = event.into();
-        self.when(event.clone())?;
-        self.ensure_valid_state()?;
-        self.store_changes(event)?;
-        Ok(())
-    }
-}
+use marketplace_framework::AggregateRoot;
 
 // ================================================================================
 // Value Objects
@@ -86,7 +67,7 @@ pub enum UserEvents {
 // Aggregate
 // ================================================================================
 
-pub trait UserProfile: AggregateRoot<Id = UserId, Event = UserEvents> {
+pub trait UserProfileAggregate: AggregateRoot<Id = UserId, Event = UserEvents> {
     // Aggregate State Properties
     fn full_name(&self) -> FullName;
     fn id(&self) -> UserId;
@@ -120,23 +101,25 @@ pub trait UserProfile: AggregateRoot<Id = UserId, Event = UserEvents> {
     }
 }
 
-pub struct UserProfileData {
+pub struct UserProfile {
     _id: Option<UserId>,
     _full_name: Option<FullName>,
     _display_name: Option<DisplayName>,
+    _changes: Vec<UserEvents>,
 }
 
-impl UserProfileData {
+impl UserProfile {
     pub fn new_empty() -> Self {
         Self {
             _id: None,
             _full_name: None,
             _display_name: None,
+            _changes: vec![],
         }
     }
 }
 
-impl AggregateRoot for UserProfileData {
+impl AggregateRoot for UserProfile {
     type Id = UserId;
     type Event = UserEvents;
 
@@ -161,11 +144,12 @@ impl AggregateRoot for UserProfileData {
     }
 
     fn store_changes(&mut self, event: Self::Event) -> Result<()> {
-        todo!()
+        self._changes.push(event);
+        Ok(())
     }
 }
 
-impl UserProfile for UserProfileData {
+impl UserProfileAggregate for UserProfile {
     fn full_name(&self) -> FullName {
         self._full_name.clone().unwrap() // Can be none
     }

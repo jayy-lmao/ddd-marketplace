@@ -1,4 +1,4 @@
-use crate::{ports::*};
+use crate::ports::*;
 use anyhow::{anyhow, Result};
 use math::round;
 use std::ops::{Add, Sub};
@@ -15,22 +15,6 @@ impl UserId {
     }
 
     /// Get a reference to the user id's  value.
-    pub fn value(&self) -> Uuid {
-        self._value
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq, Copy)]
-pub struct ClassifiedAdId {
-    _value: Uuid,
-}
-
-impl ClassifiedAdId {
-    pub fn new(value: Uuid) -> Self {
-        Self { _value: value }
-    }
-
-    /// Get a reference to the classified ad id's  value.
     pub fn value(&self) -> Uuid {
         self._value
     }
@@ -120,7 +104,7 @@ impl Add<Money> for Result<Money> {
     }
 }
 
-#[derive(PartialEq, Clone,Copy)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct Price {
     pub money: Money,
 }
@@ -141,45 +125,6 @@ impl Price {
             money: Money::from_decimal(amount, currency, lookup)?,
         })
     }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ClassifiedAdTitle {
-    _value: String,
-}
-
-impl ClassifiedAdTitle {
-    pub fn new(title: String) -> Result<Self> {
-        if title.len() > 100 {
-            return Err(anyhow!("Title cannot be longer than 100 characters"));
-        }
-        Ok(Self { _value: title })
-    }
-
-    pub fn value(&self) -> String {
-        self._value.to_owned()
-    }
-}
-#[derive(Debug, PartialEq, Clone)]
-pub struct ClassifiedAdText {
-    _value: String,
-}
-
-impl ClassifiedAdText {
-    pub fn new(text: String) -> Self {
-        Self { _value: text }
-    }
-    pub fn value(&self) -> String {
-        self._value.to_owned()
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ClassifiedAdState {
-    PendingReview,
-    Active,
-    InActive,
-    MarkedAsSold,
 }
 
 #[derive(Clone)]

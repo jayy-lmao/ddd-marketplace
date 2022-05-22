@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Result};
-use events::*;
-use marketplace_framework::{Entity, IAggregateRoot};
+use classified_ad_events::*;
+// use marketplace_framework::{Entity, IAggregateRoot};
 
-pub mod events;
+pub mod classified_ad;
+pub mod classified_ad_events;
 pub mod ports;
 pub mod simple_types;
 pub mod user_profile;
-pub mod classified_ad;
 
 pub use ports::*;
 pub use simple_types::*;
@@ -97,7 +97,7 @@ pub use simple_types::*;
 
 //         self._entity.raise(event.clone().into());
 //         self.when(event.into())?;
-        
+
 //         Ok(())
 //     }
 
