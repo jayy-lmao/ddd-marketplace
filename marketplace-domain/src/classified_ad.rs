@@ -227,7 +227,7 @@ impl AggregateRoot for ClassifiedAd {
 
 impl ClassifiedAdAggregate for ClassifiedAd {
     fn id(&self) -> Result<ClassifiedAdId> {
-        Ok(self.uuid.ok_or(anyhow!("No uuid - illegal state"))?.clone())
+        self.uuid.ok_or(anyhow!("No uuid - illegal state"))
     }
 
     fn title(&self) -> Option<ClassifiedAdTitle> {

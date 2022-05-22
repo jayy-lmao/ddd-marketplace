@@ -2,13 +2,13 @@ use std::str::FromStr;
 
 use classified_ad::{
     ClassifiedAdV1RequestToPublish, ClassifiedAdV1SetTitle, ClassifiedAdV1UpdatePrice,
-    ClassifiedAdV1UpdateText, ClassifiedAdsApplicationService, ClassifiedAdsCommandApi,
+    ClassifiedAdV1UpdateText, ClassifiedAdsApplicationService,
     ClassifiedAdsV1Create,
 };
 
 // use poem::{listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
 use poem::{
-    http::StatusCode, listener::TcpListener, middleware::Cors, web::Data, EndpointExt, Result,
+    listener::TcpListener, middleware::Cors, web::Data, EndpointExt, Result,
     Route, Server,
 };
 use poem_openapi::{
@@ -72,7 +72,7 @@ impl ClassifiedAdApi {
         request: Json<ClassifiedAdV1UpdatePrice>,
     ) -> Result<PlainText<String>> {
         let id = Uuid::from_str(request.id.as_str()).unwrap();
-        let price = request.price.clone();
+        let price = request.price;
         let currency = request.currency.clone();
         let cmd = marketplace_contracts::classified_ads::v1::UpdatePrice {
             id,

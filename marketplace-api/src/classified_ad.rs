@@ -108,7 +108,7 @@ impl ClassifiedAdsApplicationService {
             .lock()
             .unwrap()
             .load(id.value().to_string())
-            .clone();
+            ;
         operation(cmd, &mut classified_ad);
         self._repository.lock().unwrap().save(classified_ad);
         Ok(())
@@ -120,13 +120,13 @@ impl IApplicationService for ClassifiedAdsApplicationService {
     fn handle(&self, command: impl Into<Self::Command>) -> Result<()> {
         match command.into() {
             v1::Commands::Create(cmd) => self.handle_create(cmd)?,
-            v1::Commands::SetTitle(cmd) => {
+            v1::Commands::SetTitle(_cmd) => {
                 // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
                 //     let title = ClassifiedAdTitle::new()
                 //     c.set_title(cmd.title).expect("Could not set title");
                 // })?;
             }
-            v1::Commands::UpdateText(cmd) => {
+            v1::Commands::UpdateText(_cmd) => {
                 // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
                 //     c.set_text(cmd.text).expect("Could not set text");
                 // })?

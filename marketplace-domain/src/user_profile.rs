@@ -126,7 +126,7 @@ impl AggregateRoot for UserProfile {
     }
 
     fn when(&mut self, event: Self::Event) -> Result<()> {
-        match event.into() {
+        match event {
             UserEvents::UserRegistered(e) => {
                 self._display_name = Some(e.display_name);
                 self._full_name = Some(e.full_name);
