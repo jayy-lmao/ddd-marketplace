@@ -36,14 +36,14 @@ impl ClassifiedAdId {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum CurrencyCode {
     EUR,
     AUD,
 }
 const DEFAULT_CURRENCY_CODE: CurrencyCode = CurrencyCode::EUR;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub struct Money {
     pub amount: f64,
     pub currency_code: CurrencyCode,
@@ -63,7 +63,7 @@ impl Money {
     ) -> Result<Self> {
         let currency_code = match currency_code {
             Some(code) => {
-                let currency = currency_lookup.find_currency(code.clone())?;
+                let currency = currency_lookup.find_currency(code)?;
                 if !currency.in_use {
                     return Err(anyhow!("Currency code {:?} is not valid", code));
                 }
@@ -120,7 +120,7 @@ impl Add<Money> for Result<Money> {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone,Copy)]
 pub struct Price {
     pub money: Money,
 }
@@ -155,6 +155,10 @@ impl ClassifiedAdTitle {
         }
         Ok(Self { _value: title })
     }
+
+    pub fn value(&self) -> String {
+        self._value.to_owned()
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub struct ClassifiedAdText {
@@ -164,6 +168,9 @@ pub struct ClassifiedAdText {
 impl ClassifiedAdText {
     pub fn new(text: String) -> Self {
         Self { _value: text }
+    }
+    pub fn value(&self) -> String {
+        self._value.to_owned()
     }
 }
 

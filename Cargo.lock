@@ -588,6 +588,7 @@ dependencies = [
 name = "marketplace-api"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "lazy_static",
  "marketplace-contracts",
  "marketplace-domain",
@@ -623,6 +624,9 @@ dependencies = [
 [[package]]
 name = "marketplace-framework"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
 
 [[package]]
 name = "matchers"

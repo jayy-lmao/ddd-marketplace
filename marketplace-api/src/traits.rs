@@ -1,3 +1,4 @@
+use anyhow::Result;
 use poem::async_trait;
 
 pub trait IHandleCommand {
@@ -17,5 +18,6 @@ pub trait IEntityStore: Sync + Send {
 
 pub trait IApplicationService {
     type Command;
-    fn handle(&self, command: impl Into<Self::Command>);
+    fn handle(&self, command: impl Into<Self::Command>) -> Result<()>;
 }
+
