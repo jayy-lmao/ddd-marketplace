@@ -88,10 +88,10 @@ pub trait ClassifiedAdAggregate:
     }
 
     /// Set the classified ad's  text.
-    fn set_text(&mut self, text: ClassifiedAdText) -> Result<()> {
+    fn set_text(&mut self, text: String) -> Result<()> {
         let event = ClassifiedAdTextUpdated {
             id: self.id()?.value(),
-            ad_text: text.value(),
+            ad_text: text,
         };
         self.apply(event)?;
 
@@ -99,10 +99,10 @@ pub trait ClassifiedAdAggregate:
     }
 
     /// Set the classified ad's  title.
-    fn set_title(&mut self, title: ClassifiedAdTitle) -> Result<()> {
+    fn set_title(&mut self, title: String) -> Result<()> {
         let event = ClassifiedAdTitleChanged {
             id: self.id()?.value(),
-            title: title.value(),
+            title,
         };
         self.apply(event)?;
 

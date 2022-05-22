@@ -94,23 +94,22 @@ impl ClassifiedAdsApplicationService {
         }
         let classified_ad =
             ClassifiedAd::new(ClassifiedAdId::new(cmd.id), UserId::new(cmd.owner_id));
-        self._repository.lock().unwrap().save(classified_ad);
+        self._repository.lock().unwrap().save(classified_ad)?;
         Ok(())
     }
     fn handle_update<Cmd>(
         &self,
         id: ClassifiedAdId,
         cmd: Cmd,
-        operation: fn(cmd: Cmd, c: &mut ClassifiedAd),
+        operation: fn(cmd: Cmd, c: &mut ClassifiedAd) -> Result<()>,
     ) -> Result<()> {
         let mut classified_ad = self
             ._repository
             .lock()
             .unwrap()
-            .load(id.value().to_string())
-            ;
-        operation(cmd, &mut classified_ad);
-        self._repository.lock().unwrap().save(classified_ad);
+            .load(id.value().to_string());
+        operation(cmd, &mut classified_ad)?;
+        self._repository.lock().unwrap().save(classified_ad)?;
         Ok(())
     }
 }
@@ -120,16 +119,17 @@ impl IApplicationService for ClassifiedAdsApplicationService {
     fn handle(&self, command: impl Into<Self::Command>) -> Result<()> {
         match command.into() {
             v1::Commands::Create(cmd) => self.handle_create(cmd)?,
-            v1::Commands::SetTitle(_cmd) => {
-                // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
-                //     let title = ClassifiedAdTitle::new()
-                //     c.set_title(cmd.title).expect("Could not set title");
-                // })?;
+            v1::Commands::SetTitle(cmd) => {
+                self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
+                    c.set_title(cmd.title).expect("Could not set title");
+                    Ok(())
+                })?;
             }
-            v1::Commands::UpdateText(_cmd) => {
-                // self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
-                //     c.set_text(cmd.text).expect("Could not set text");
-                // })?
+            v1::Commands::UpdateText(cmd) => {
+                self.handle_update(ClassifiedAdId::new(cmd.id), cmd, |cmd, c| {
+                    c.set_text(cmd.text).expect("Could not set text");
+                    Ok(())
+                })?
             }
             v1::Commands::UpdatePrice(_) => todo!(),
             v1::Commands::RequestToPublish(_) => todo!(),
